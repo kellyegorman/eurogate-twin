@@ -21,16 +21,13 @@ indo_std = indo_std.rename(columns={
 })
 
 indo_std["port"] = "Tanjung Perak"
-indo_std["country"] = "Indonesia"
 # indo_std["source_dataset"] = "clean_and_viz_weather"
 
-# Iindonesia-specific fields not in euro
-indo_std["teu"] = np.where(
-    indo_std["container_size"] == 40, 2,
-    np.where(indo_std["container_size"] == 20, 1, np.nan)
-)
-
-indo_std["reefer"] = indo_std.get("CTR_TYPE_RFR", np.nan)
+# CTR_TYPE_RFR and reefer are the same signal; keep a single reefer column
+if "CTR_TYPE_RFR" in indo_std.columns:
+    indo_std["reefer"] = indo_std["CTR_TYPE_RFR"]
+else:
+    indo_std["reefer"] = np.nan
 indo_std["released"] = np.nan
 indo_std["arrival_time"] = indo_std["weather_match_time"]
 indo_std["departure_time"] = np.nan
@@ -40,7 +37,6 @@ indo_std["arrival_type"] = np.nan
 indo_std["departure_type"] = np.nan
 indo_std["origin_transport_code"] = np.nan
 indo_std["arrival_pol_code"] = np.nan
-indo_std["destination_code"] = np.nan
 indo_std["line_code"] = np.nan
 
 # now work on the eurogate dataset, standardize it
@@ -56,11 +52,9 @@ euro_std = euro_std.rename(columns={
     "departureType": "departure_type",
     "originOfTransportCode": "origin_transport_code",
     "arrivalPolCode": "arrival_pol_code",
-    "destinationCode": "destination_code",
 })
 
 euro_std["port"] = "Eurogate Hamburg"
-euro_std["country"] = "Germany"
 # euro_std["source_dataset"] = "eurogate_container_history_weather"
 
 # teu -> approximate container size
@@ -86,7 +80,6 @@ euro_std["CTR_TYPE_DRY"] = np.nan
 euro_std["CTR_TYPE_FLT"] = np.nan
 euro_std["CTR_TYPE_O/T"] = np.nan
 euro_std["CTR_TYPE_OVD"] = np.nan
-euro_std["CTR_TYPE_RFR"] = euro_std["reefer"]
 euro_std["CTR_TYPE_TNK"] = np.where(euro_std["typeCode"].astype(str).str.upper().eq("TK"), 1, 0)
 
 # Eurogate has no Indonesian customs document columns
@@ -117,32 +110,24 @@ print(f"Overlapping container IDs renamed in Eurogate: {len(overlap_ids)}")
 final_cols = [
     "container_id",
     "port",
-    "country",
     # "source_dataset",
 
     # target!!
     "dwell_hours",
 
     "container_size",
-    "teu",
     "gross_weight",
     "reefer",
     "arrival_time",
     "departure_time",
     "arrival_voyage_eta",
-    "weather_match_time",
-    "weather_hour",
-    "weather_time",
     "temperature_2m",
     "relative_humidity_2m",
     "precipitation",
-    "rain",
     "weather_code",
     "cloud_cover",
     "wind_speed_10m",
     "wind_gusts_10m",
-    "is_raining",
-    "bad_weather_score",
 
     # indonesian 
     "n_events",
@@ -158,7 +143,6 @@ final_cols = [
     "CTR_TYPE_FLT",
     "CTR_TYPE_O/T",
     "CTR_TYPE_OVD",
-    "CTR_TYPE_RFR",
     "CTR_TYPE_TNK",
     "JOB_DEL_DOCTYPE_BC23",
     "JOB_DEL_DOCTYPE_BCF26",
@@ -180,7 +164,6 @@ final_cols = [
     "departure_type",
     "origin_transport_code",
     "arrival_pol_code",
-    "destination_code",
     "released",
     "n_unique_locations_x",
     "n_unique_locations_y",
@@ -211,7 +194,6 @@ bool_cols = [
     "CTR_TYPE_FLT",
     "CTR_TYPE_O/T",
     "CTR_TYPE_OVD",
-    "CTR_TYPE_RFR",
     "CTR_TYPE_TNK",
 ]
 
@@ -231,6 +213,9 @@ for col in bool_cols:
 # make sure dwell hours is numeric (it should be anyways but this is just a double check)
 mega["dwell_hours"] = pd.to_numeric(mega["dwell_hours"], errors="coerce")
 
+rows_before = len(mega)
+mega = mega[mega["dwell_hours"].notna()].copy()
+print(f"Dropped {rows_before - len(mega):,} rows with missing dwell_hours")
 
 mega.to_csv(OUTPUT_CSV, index=False)
 
