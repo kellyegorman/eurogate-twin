@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import joblib
+from pathlib import Path
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import ExtraTreesClassifier
@@ -491,14 +493,9 @@ print(result_path)
 print(predict_path)
 print(importance_path)
 
-import joblib
-from pathlib import Path
-
 ARTIFACT_DIR = Path("model_artifacts")
 ARTIFACT_DIR.mkdir(exist_ok=True)
 
 joblib.dump(model, ARTIFACT_DIR / "dwell_bucket_extra_trees.joblib")
 joblib.dump(list(X_train.columns), ARTIFACT_DIR / "dwell_bucket_feature_columns.joblib")
 joblib.dump(medians, ARTIFACT_DIR / "dwell_bucket_feature_medians.joblib")
-
-print("Saved model artifacts.")

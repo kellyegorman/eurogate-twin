@@ -364,7 +364,7 @@ def load_synthetic_containers(n=100, seed=42):
     return containers
 
 
-def generate_initial_yard_containers(n=50, seed=42, base_time=None):
+def generate_initial_yard_containers(n=50, seed=13, base_time=None):
     rng = np.random.default_rng(seed)
 
     if base_time is None:
@@ -522,14 +522,15 @@ class SimState:
         return self.yard.overflow_penalty()
 
     def total_cost(self):
-        return self.total_reshuffles + self.overflow_penalty()
+        return (self.total_reshuffles*10) + self.overflow_penalty()
 
 
 # UI
 class YardSimApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Time-Based Split-Screen Yard Simulation with Overflow")
+        # self.root.title("Time-Based Split-Screen Yard Simulation with Overflow")
+        self.root.title("Bucket Heuristics VS Rule-Only Yard Simulations")
         self.root.geometry("1700x920")
 
         self.containers = []
@@ -571,33 +572,33 @@ class YardSimApp:
 
         ttk.Label(self.left, text="Settings", font=("Arial", 12, "bold")).pack(anchor="w")
 
-        self.n_import_var = tk.IntVar(value=5)
-        self.n_export_var = tk.IntVar(value=5)
+        self.n_import_var = tk.IntVar(value=8)
+        self.n_export_var = tk.IntVar(value=8)
         self.n_container_var = tk.IntVar(value=100)
-        self.seed_var = tk.IntVar(value=42)
+        self.seed_var = tk.IntVar(value=13)
         self.speed_var = tk.IntVar(value=700)
 
         self.populate_initial_var = tk.BooleanVar(value=True)
         self.initial_container_var = tk.IntVar(value=60)
 
-        self._spin("Import stacks", self.n_import_var, 1, 20)
-        self._spin("Export stacks", self.n_export_var, 1, 20)
-        self._spin("New containers", self.n_container_var, 5, 500)
-        self._spin("Random seed", self.seed_var, 0, 9999)
+        self._spin("IMPORT stacks", self.n_import_var, 1, 20)
+        self._spin("EXPORT stacks", self.n_export_var, 1, 20)
+        self._spin("New containers to place/retrieve", self.n_container_var, 5, 500)
+        # self._spin("Random seed", self.seed_var, 0, 9999)
 
-        ttk.Checkbutton(
-            self.left,
-            text="Populate yard in advance",
-            variable=self.populate_initial_var,
-        ).pack(anchor="w", pady=(8, 2))
+        # ttk.Checkbutton(
+        #     self.left,
+        #     text="Populate yard in advance",
+        #     variable=self.populate_initial_var,
+        # ).pack(anchor="w", pady=(8, 2))
 
-        self._spin("Initial old containers", self.initial_container_var, 0, 500)
+        self._spin("Number of containers already on the yard", self.initial_container_var, 0, 500)
 
-        ttk.Button(self.left, text="Load Synthetic + Predict", command=self.generate).pack(fill=tk.X, pady=4)
+        ttk.Button(self.left, text="Load containers + predict", command=self.generate).pack(fill=tk.X, pady=4)
         ttk.Button(self.left, text="Start", command=self.start).pack(fill=tk.X, pady=4)
         ttk.Button(self.left, text="Pause", command=self.pause).pack(fill=tk.X, pady=4)
-        ttk.Button(self.left, text="Step 1 Hour", command=self.step).pack(fill=tk.X, pady=4)
-        ttk.Button(self.left, text="Reset", command=self.reset).pack(fill=tk.X, pady=4)
+        ttk.Button(self.left, text="1 hour step", command=self.step).pack(fill=tk.X, pady=4)
+        ttk.Button(self.left, text="Start over", command=self.reset).pack(fill=tk.X, pady=4)
 
         # ttk.Label(self.left, text="Animation speed").pack(anchor="w", pady=(15, 0))
         # ttk.Scale(
@@ -873,22 +874,22 @@ class YardSimApp:
         text = (
             "Bucket\n"
             f"  reshuffles: {self.bucket_sim.total_reshuffles}\n"
-            f"  placed new: {self.bucket_sim.placed_count}\n"
-            f"  placed old: {self.bucket_sim.initial_placed_count}\n"
+            f"  placed: {self.bucket_sim.placed_count}\n"
+            # f"  placed old: {self.bucket_sim.initial_placed_count}\n"
             f"  retrieved: {self.bucket_sim.retrieved_count}\n"
-            f"  overflow yards: {self.bucket_sim.yard.overflow_yard_count}\n"
+            # f"  overflow yards: {self.bucket_sim.yard.overflow_yard_count}\n"
             f"  overflow containers: {self.bucket_sim.yard.overflow_container_count}\n"
-            f"  overflow penalty: {self.bucket_sim.overflow_penalty()}\n"
-            f"  total cost: {self.bucket_sim.total_cost()}\n\n"
+            # f"  overflow penalty: {self.bucket_sim.overflow_penalty()}\n"
+            # f"  total cost: {self.bucket_sim.total_cost()}\n\n"
             "Baseline\n"
             f"  reshuffles: {self.baseline_sim.total_reshuffles}\n"
-            f"  placed new: {self.baseline_sim.placed_count}\n"
-            f"  placed old: {self.baseline_sim.initial_placed_count}\n"
+            f"  placed: {self.baseline_sim.placed_count}\n"
+            # f"  placed old: {self.baseline_sim.initial_placed_count}\n"
             f"  retrieved: {self.baseline_sim.retrieved_count}\n"
-            f"  overflow yards: {self.baseline_sim.yard.overflow_yard_count}\n"
+            # f"  overflow yards: {self.baseline_sim.yard.overflow_yard_count}\n"
             f"  overflow containers: {self.baseline_sim.yard.overflow_container_count}\n"
-            f"  overflow penalty: {self.baseline_sim.overflow_penalty()}\n"
-            f"  total cost: {self.baseline_sim.total_cost()}\n\n"
+            # f"  overflow penalty: {self.baseline_sim.overflow_penalty()}\n"
+            # f"  total cost: {self.baseline_sim.total_cost()}\n\n"
             f"Reshuffle reduction: {reshuffle_reduction}\n"
             f"Total cost reduction: {total_cost_reduction}"
         )
