@@ -17,7 +17,7 @@ MODEL_PATH = "model_artifacts/dwell_bucket_extra_trees.joblib"
 FEATURE_COLS_PATH = "model_artifacts/dwell_bucket_feature_columns.joblib"
 MEDIANS_PATH = "model_artifacts/dwell_bucket_feature_medians.joblib"
 
-SYNTHETIC_CSV_PATH = "/Users/kellyg/eurogate-twin-1/synthetic_data/synthetic_1000_rows.csv"  # change if needed
+SYNTHETIC_CSV_PATH = "/Users/kellyg/eurogate-twin-1/synthetic_data/synthetic_1000_rows.csv"  
 
 PREFERRED_TIER_FROM_BUCKET = {
     0: 3,
@@ -213,7 +213,7 @@ def prepare_features_for_model(df, feature_cols, medians):
     return X
 
 
-def load_synthetic_containers(n=100, seed=42):
+def load_synthetic_containers(n=100, seed=10):
     model, feature_cols, medians = load_model_artifacts()
 
     df = pd.read_csv(SYNTHETIC_CSV_PATH)
@@ -411,8 +411,8 @@ class YardSimApp:
 
         self.n_import_var = tk.IntVar(value=5)
         self.n_export_var = tk.IntVar(value=5)
-        self.n_container_var = tk.IntVar(value=100)
-        self.seed_var = tk.IntVar(value=42)
+        self.n_container_var = tk.IntVar(value=50)
+        self.seed_var = tk.IntVar(value=10)
         self.speed_var = tk.IntVar(value=700)
 
         self._spin("Import stacks", self.n_import_var, 1, 20)
@@ -426,14 +426,14 @@ class YardSimApp:
         ttk.Button(self.left, text="Step 1 Hour", command=self.step).pack(fill=tk.X, pady=4)
         ttk.Button(self.left, text="Reset", command=self.reset).pack(fill=tk.X, pady=4)
 
-        ttk.Label(self.left, text="Animation speed").pack(anchor="w", pady=(15, 0))
-        ttk.Scale(
-            self.left,
-            from_=1500,
-            to=100,
-            variable=self.speed_var,
-            orient=tk.HORIZONTAL
-        ).pack(fill=tk.X)
+        # ttk.Label(self.left, text="Animation speed").pack(anchor="w", pady=(15, 0))
+        # ttk.Scale(
+        #     self.left,
+        #     from_=1500,
+        #     to=100,
+        #     variable=self.speed_var,
+        #     orient=tk.HORIZONTAL
+        # ).pack(fill=tk.X)
 
         ttk.Separator(self.left).pack(fill=tk.X, pady=15)
 
