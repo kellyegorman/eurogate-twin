@@ -556,20 +556,22 @@ class YardSimApp:
         self.right = ttk.Frame(self.main)
         self.right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        self.bucket_canvas = tk.Canvas(self.right, bg="white", width=720, height=620)
-        self.bucket_canvas.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.right.grid_rowconfigure(0, weight=3)
+        self.right.grid_rowconfigure(1, weight=1)
+        self.right.grid_columnconfigure(0, weight=1)
+        self.right.grid_columnconfigure(1, weight=1)
 
-        self.baseline_canvas = tk.Canvas(self.right, bg="white", width=720, height=620)
-        self.baseline_canvas.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        self.bucket_canvas, bucket_frame = self._make_scrollable_canvas(self.right)
+        bucket_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        self.baseline_canvas, baseline_frame = self._make_scrollable_canvas(self.right)
+        baseline_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
         self.bucket_text = tk.Text(self.right, height=11, width=85)
         self.bucket_text.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
 
         self.baseline_text = tk.Text(self.right, height=11, width=85)
         self.baseline_text.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)
-
-        self.right.grid_columnconfigure(0, weight=1)
-        self.right.grid_columnconfigure(1, weight=1)
 
         ttk.Label(self.left, text="Settings", font=("Arial", 12, "bold")).pack(anchor="w")
 
@@ -619,6 +621,44 @@ class YardSimApp:
 
         self.stats_label = ttk.Label(self.left, text="", justify=tk.LEFT)
         self.stats_label.pack(anchor="w")
+
+    def _make_scrollable_canvas(self, parent, width=720, height=560):
+        """Wrap a Canvas in a frame with horizontal + vertical scrollbars so
+        content that's wider/taller than the visible area (lots of stacks,
+        lots of overflow yards) can be reached instead of overlapping or
+        getting clipped off-screen."""
+        frame = ttk.Frame(parent)
+        frame.grid_rowconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+
+        canvas = tk.Canvas(frame, bg="white", width=width, height=height,
+                            scrollregion=(0, 0, width, height))
+        canvas.grid(row=0, column=0, sticky="nsew")
+
+        yscroll = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        yscroll.grid(row=0, column=1, sticky="ns")
+
+        xscroll = ttk.Scrollbar(frame, orient="horizontal", command=canvas.xview)
+        xscroll.grid(row=1, column=0, sticky="ew")
+
+        canvas.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def _on_shift_mousewheel(event):
+            canvas.xview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind("<Enter>", lambda e: (
+            canvas.bind_all("<MouseWheel>", _on_mousewheel),
+            canvas.bind_all("<Shift-MouseWheel>", _on_shift_mousewheel),
+        ))
+        canvas.bind("<Leave>", lambda e: (
+            canvas.unbind_all("<MouseWheel>"),
+            canvas.unbind_all("<Shift-MouseWheel>"),
+        ))
+
+        return canvas, frame
 
     def _spin(self, label, variable, low, high):
         ttk.Label(self.left, text=label).pack(anchor="w")
@@ -706,38 +746,79 @@ class YardSimApp:
         self.update_text_panels()
         self.update_stats()
 
+    def short_stack_label(self, stack_id):
+        """Shorten stack ids so labels don't collide when boxes are small,
+        e.g. 'OVERFLOW_2_EXP_3' -> 'O2-EXP3', 'MAIN_IMP_0' -> 'IMP_0'."""
+        label = stack_id.replace("MAIN_", "")
+
+        if label.startswith("OVERFLOW_"):
+            parts = label.split("_")
+            if len(parts) >= 4:
+                zone_num, kind, idx = parts[1], parts[2], parts[3]
+                label = f"O{zone_num}-{kind}{idx}"
+
+        return label
+
     def draw_canvas(self, canvas, sim, title):
         canvas.delete("all")
         canvas.create_text(360, 25, text=title, font=("Arial", 15, "bold"))
         self.draw_legend(canvas)
 
         if sim is None:
+            canvas.configure(scrollregion=(0, 0, 720, 560))
             return
 
         main_import = [s for s in sim.yard.main_stacks() if s.yard_type == "IMPORT"]
         main_export = [s for s in sim.yard.main_stacks() if s.yard_type == "EXPORT"]
 
-        canvas.create_text(180, 80, text="MAIN IMPORT", fill="blue", font=("Arial", 11, "bold"))
-        canvas.create_text(535, 80, text="MAIN EXPORT", fill="green", font=("Arial", 11, "bold"))
+        box_w, box_h, gap = 48, 42, 14
+        group_gap = 60  # gap between the import block and the export block
 
-        self.draw_stack_group(canvas, main_import, start_x=40, base_y=400)
-        self.draw_stack_group(canvas, main_export, start_x=390, base_y=400)
+        import_start_x = 40
+        import_group_w = len(main_import) * (box_w + gap)
+
+        export_start_x = import_start_x + import_group_w + group_gap
+        export_group_w = len(main_export) * (box_w + gap)
+
+        base_y = 400
+
+        canvas.create_text(
+            import_start_x + import_group_w / 2, 80,
+            text="MAIN IMPORT", fill="blue", font=("Arial", 11, "bold"),
+        )
+        canvas.create_text(
+            export_start_x + export_group_w / 2, 80,
+            text="MAIN EXPORT", fill="green", font=("Arial", 11, "bold"),
+        )
+
+        self.draw_stack_group(canvas, main_import, start_x=import_start_x, base_y=base_y,
+                               box_w=box_w, box_h=box_h, gap=gap)
+        self.draw_stack_group(canvas, main_export, start_x=export_start_x, base_y=base_y,
+                               box_w=box_w, box_h=box_h, gap=gap)
+
+        content_w = max(export_start_x + export_group_w, 720)
+        content_h = base_y + 60
 
         overflow_stacks = sim.yard.overflow_stacks()
 
         if overflow_stacks:
-            canvas.create_text(360, 455, text="OVERFLOW YARD(S)", fill="red", font=("Arial", 11, "bold"))
-            shown = overflow_stacks[:10]
-            self.draw_stack_group(canvas, shown, start_x=55, base_y=590, small=True)
+            canvas.create_text(
+                content_w / 2, 455,
+                text=f"OVERFLOW YARD(S)  ({len(overflow_stacks)} stacks)",
+                fill="red", font=("Arial", 11, "bold"),
+            )
 
-            if len(overflow_stacks) > 10:
-                canvas.create_text(
-                    600,
-                    575,
-                    text=f"+ {len(overflow_stacks) - 10} more overflow stacks",
-                    font=("Arial", 9),
-                    fill="red",
-                )
+            of_max_x, of_max_y = self.draw_stack_group_wrapped(
+                canvas, overflow_stacks,
+                start_x=40, start_y=590,
+                max_row_width=max(content_w, 900),
+                box_w=42, box_h=32, gap=10,
+            )
+
+            content_w = max(content_w, of_max_x)
+            content_h = max(content_h, of_max_y)
+
+        canvas.configure(scrollregion=(0, 0, content_w + 20, content_h + 20))
 
     def draw_legend(self, canvas):
         x = 35
@@ -761,67 +842,91 @@ class YardSimApp:
             )
             x += 75
 
-    def draw_stack_group(self, canvas, stacks, start_x, base_y, small=False):
-        box_w = 48 if not small else 42
-        box_h = 42 if not small else 32
-        gap = 14 if not small else 10
+    def draw_single_stack(self, canvas, stack, x, base_y, box_w, box_h):
+        canvas.create_rectangle(
+            x - 4,
+            base_y + 4,
+            x + box_w + 4,
+            base_y + 12,
+            fill="#bdbdbd",
+            outline="#777",
+        )
 
-        for idx, stack in enumerate(stacks):
-            x = start_x + idx * (box_w + gap)
+        canvas.create_text(
+            x + box_w / 2,
+            base_y + 28,
+            text=self.short_stack_label(stack.stack_id),
+            font=("Arial", 7, "bold"),
+        )
+
+        for tier in range(MAX_HEIGHT):
+            y_top = base_y - (tier + 1) * box_h
+            canvas.create_rectangle(
+                x,
+                y_top,
+                x + box_w,
+                y_top + box_h,
+                outline="#dddddd",
+                dash=(3, 3),
+            )
+
+        for tier, c in enumerate(stack.containers):
+            y_top = base_y - (tier + 1) * box_h
+
+            outline = "black"
+            width = 1
+
+            if c.is_initial_yard_container:
+                outline = "#283593"
+                width = 3
 
             canvas.create_rectangle(
-                x - 4,
-                base_y + 4,
-                x + box_w + 4,
-                base_y + 12,
-                fill="#bdbdbd",
-                outline="#777",
+                x,
+                y_top,
+                x + box_w,
+                y_top + box_h,
+                fill=BUCKET_COLORS[c.pred_bucket],
+                outline=outline,
+                width=width,
             )
 
             canvas.create_text(
                 x + box_w / 2,
-                base_y + 28,
-                text=stack.stack_id.replace("MAIN_", ""),
+                y_top + box_h / 2,
+                text=c.container_id[-4:],
                 font=("Arial", 7, "bold"),
             )
 
-            for tier in range(MAX_HEIGHT):
-                y_top = base_y - (tier + 1) * box_h
-                canvas.create_rectangle(
-                    x,
-                    y_top,
-                    x + box_w,
-                    y_top + box_h,
-                    outline="#dddddd",
-                    dash=(3, 3),
-                )
+    def draw_stack_group(self, canvas, stacks, start_x, base_y, box_w=48, box_h=42, gap=14):
+        for idx, stack in enumerate(stacks):
+            x = start_x + idx * (box_w + gap)
+            self.draw_single_stack(canvas, stack, x, base_y, box_w, box_h)
 
-            for tier, c in enumerate(stack.containers):
-                y_top = base_y - (tier + 1) * box_h
+    def draw_stack_group_wrapped(self, canvas, stacks, start_x, start_y, max_row_width,
+                                  box_w=42, box_h=32, gap=10):
+        """Lay out stacks left-to-right, wrapping onto a new row once
+        max_row_width is reached, instead of truncating the list. Returns
+        the (max_x, max_y) actually used so the caller can size the
+        scrollregion to fit everything."""
+        per_row = max(1, int((max_row_width - start_x) // (box_w + gap)))
+        row_height = box_h * MAX_HEIGHT + 60  # tiers going up + label + inter-row margin
 
-                outline = "black"
-                width = 1
+        max_x = start_x
+        max_y = start_y
 
-                if c.is_initial_yard_container:
-                    outline = "#283593"
-                    width = 3
+        for row_start in range(0, len(stacks), per_row):
+            row_stacks = stacks[row_start: row_start + per_row]
+            row_idx = row_start // per_row
+            row_base_y = start_y + row_idx * row_height
 
-                canvas.create_rectangle(
-                    x,
-                    y_top,
-                    x + box_w,
-                    y_top + box_h,
-                    fill=BUCKET_COLORS[c.pred_bucket],
-                    outline=outline,
-                    width=width,
-                )
+            for idx, stack in enumerate(row_stacks):
+                x = start_x + idx * (box_w + gap)
+                self.draw_single_stack(canvas, stack, x, row_base_y, box_w, box_h)
+                max_x = max(max_x, x + box_w)
 
-                canvas.create_text(
-                    x + box_w / 2,
-                    y_top + box_h / 2,
-                    text=c.container_id[-4:],
-                    font=("Arial", 7, "bold"),
-                )
+            max_y = max(max_y, row_base_y + 30)
+
+        return max_x, max_y
 
     def update_text_panels(self):
         self.bucket_text.delete("1.0", tk.END)
@@ -901,4 +1006,4 @@ class YardSimApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = YardSimApp(root)
-    root.mainloop()
+    root.mainloop() 
