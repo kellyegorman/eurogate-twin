@@ -1,0 +1,5 @@
+metric,min,q1,median,q3,max
+baseline_reshuffles,120,181.0,210.0,246.0,354
+bucket_reshuffles,38,97.0,118.5,145.0,237
+baseline_cost,1870,2919.75,3478.5,4232.5,6743
+bucket_cost,1330,2246.75,2727.5,3285.5,5311
